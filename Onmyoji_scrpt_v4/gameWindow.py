@@ -5,6 +5,7 @@ Created on 2019/6/5 16:40:34
 @author: tsfissure
 '''
 
+import controller as ctrller
 import const
 import os, random
 import traceback
@@ -14,14 +15,17 @@ import cv2
 import pymouse
 
 class GameWindow(object):
-    def __init__(self, hwnd, windowOrder, fightType):
+    def __init__(self, hwnd, windowOrder, fightType, layer = 0):
         """
         hwnd：游戏窗口句柄
         windowOrder: 游戏窗口序号
+        fightType: 副本/探索
+        layer: 第layer章探索(单人生效)
         """
         self.mHwnd = hwnd
         self.mWindowOrder = windowOrder # 窗口顺序,探索组队时司机要在左边(order为0)
         self.mFightType = fightType
+        self.mLayer = layer
         self.mMouseCtrl = pymouse.PyMouse()
         self.OnInit()
         self.InitPoints()
@@ -46,12 +50,16 @@ class GameWindow(object):
         else:
             self.mClickImages.append(const.NAME_TANSUO_BOX)
             if 0 == self.mWindowOrder: # 司机
+            # if self.mFightType != const.FIGHT_TYPE_TANSUO_DOUBLE or 0 == self.mWindowOrder: # 司机
                 self.mClickImages.append(const.NAME_TANSUO)
                 self.mClickImages.append(const.NAME_TANSUO_BOSS)
                 self.mClickImages.append(const.NAME_TANSUO_FIGHT)
                 self.mClickImages.append(const.NAME_INVITE)
-        self.mClickImages.append(const.NAME_CONFIRM)
+            if self.mLayer > 0:
+                self.mClickImages.append("ts%s.png" % self.mLayer)
         self.mClickImages.append(const.NAME_TASK)
+        self.mClickImages.append(const.NAME_READY_BTN)
+        self.mClickImages.append(const.NAME_CONFIRM)
         self.mClickImages.append(const.NAME_ACCEPT)
 
     def InitPoints(self):
@@ -63,7 +71,9 @@ class GameWindow(object):
         self.mTSLeftMovePos = (int(self.mHwndLeftUpX + 100), int(self.mHwndLeftUpY + self.mWindowHeight * 3.0 / 4)) # 探索左移坐标
         self.mTSRightMovePos = (int(self.mHwndLeftUpX + self.mWindowWidth - 100), int(self.mHwndLeftUpY + self.mWindowHeight * 3.0 / 4)) # 探索右移坐标
         # 没有操作时的点击,预防奖励把屏幕占满找不到可点的)
-        self.mNoOperatePos = (int(self.mHwndLeftUpX + self.mWindowWidth / 3.0), int(self.mWindowHeight - 10))
+        self.mNoOperatePos = (int(self.mHwndLeftUpX + 100), int(self.mWindowHeight * 0.82))
+        # # 探索的时候如果在主界面，需要滚动，利用这个坐标滚动动
+        # self.mTowerPos = (int(self.mHwndLeftUpX + width * 0.88), int(self.mHwndLeftUpY + height * 0.5))
 
     def LoadImageInternal(self, name):
         """ LoadImages common """
@@ -81,6 +91,7 @@ class GameWindow(object):
         self.LoadImageInternal(const.NAME_TASK)
         self.LoadImageInternal(const.NAME_ACCEPT)
         self.LoadImageInternal(const.NAME_CONFIRM)
+        self.LoadImageInternal(const.NAME_READY_BTN)
         if self.mFightType == const.FIGHT_TYPE_DUPLICATE:
             self.LoadImageInternal(const.NAME_AUTO_INVITE)
             self.LoadImageInternal(const.NAME_AUTO_ACCETP)
@@ -88,12 +99,16 @@ class GameWindow(object):
             self.LoadImageInternal(const.NAME_DUP_FIGHT)
         else:
             self.LoadImageInternal(const.NAME_TANSUO_BOX)
-            if 0 == self.mWindowOrder: #司机
+            # if self.mFightType != const.FIGHT_TYPE_TANSUO_DOUBLE or 0 == self.mWindowOrder: # 司机
+            if 0 == self.mWindowOrder: # 司机
                 self.LoadImageInternal(const.NAME_TANSUO)
                 self.LoadImageInternal(const.NAME_TANSUO_FIGHT)
                 self.LoadImageInternal(const.NAME_TANSUO_MAIN)
                 self.LoadImageInternal(const.NAME_TANSUO_BOSS)
                 self.LoadImageInternal(const.NAME_INVITE)
+                # self.LoadImageInternal(const.NAME_YUHUN_BTN)
+            if self.mLayer > 0:
+                self.LoadImageInternal("ts%d.png" % self.mLayer)
 
     def ScreenShot(self):
         """ 截图 网上找的代码直接复制修改的 """
@@ -143,25 +158,32 @@ class GameWindow(object):
 
     def Update(self):
         self.ScreenShot()
-        for img in self.mClickImages:
-            if self.TryClick(img):
-                self.mTansuoMoveCnt = 0
-                break
-        else:
-            if self.mFightType == const.FIGHT_TYPE_TANSUO:
-                if 0 == self.mWindowOrder and self.CheckImageExists(const.NAME_TANSUO_MAIN): #探索的时候在主界面，移动
-                    # print("探索主界面", self.mWindowOrder)
-                    self.mTansuoMoveCnt += 1
-                    if 1 == (int(self.mTansuoMoveCnt / 5) & 1):
-                        self.TryMouseClickPos(self.mTSLeftMovePos)
+        try:
+            for img in self.mClickImages:
+                if self.TryClick(img):
+                    self.mTansuoMoveCnt = 0
+                    break
+            else:
+                if self.mFightType == const.FIGHT_TYPE_TANSUO:
+                    if 0 == self.mWindowOrder and self.CheckImageExists(const.NAME_TANSUO_MAIN): #探索的时候在主界面，移动
+                        # print("探索主界面", self.mWindowOrder)
+                        self.mTansuoMoveCnt += 1
+                        if 1 == (int(self.mTansuoMoveCnt / 5) & 1):
+                            self.TryMouseClickPos(self.mTSLeftMovePos)
+                        else:
+                            self.TryMouseClickPos(self.mTSRightMovePos)
+                    # elif self.mLayer > 0 and self.CheckImageExists(const.NAME_YUHUN_BTN): # 需要滚动右边的探索章节
+                    #     self.mMouseCtrl.move(self.mTowerPos[0], self.mTowerPos[1])
+                    #     self.mMouseCtrl.scroll(4)
+                    #     print("滚动")
                     else:
-                        self.TryMouseClickPos(self.mTSRightMovePos)
-                else:
-                    # print("三分之一", self.mWindowOrder)
+                        # print("左下方", self.mWindowOrder)
+                        self.TryMouseClickPos(self.mNoOperatePos)
+                elif self.mFightType == const.FIGHT_TYPE_DUPLICATE:
+                    # print("界面左下方", self.mWindowOrder)
                     self.TryMouseClickPos(self.mNoOperatePos)
-            elif self.mFightType == const.FIGHT_TYPE_DUPLICATE:
-                # print("界面左下方三分之一", self.mWindowOrder)
-                self.TryMouseClickPos(self.mNoOperatePos)
+        except:
+            ctrller.WriteErrorLog()
 
 # instance = GameWindow(0, 1)
 

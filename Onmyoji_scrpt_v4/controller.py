@@ -5,13 +5,24 @@ Created on 2019/6/6 9:58:31
 @author: tsfissure
 '''
 
-import time
+import time, os, traceback
 import pymouse as pms
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from pynput import keyboard
 import random
 from win32api import GetSystemMetrics
 import gameWindow
+
+def WriteErrorLog():
+    try:
+        logPath = time.strftime("%Y/%m/%d")
+        if not os.path.exists(logPath):
+            os.makedirs(logPath)
+        with open(os.path.join(logPath, time.strftime("%H.log")), "a") as of:
+            print(time.strftime("[%Y-%m-%d %H:%M:%S]:"), file = of)
+            traceback.print_exc(limit = 5, file = of)
+    except:
+        pass
 
 class StopEventController(QThread):
     signalEvent = pyqtSignal()
@@ -39,13 +50,17 @@ instStopMouseController = StopMouseController()
 
 class MouseController(QThread):
     
-    def __init__(self, hwndList, fightType):
+    def __init__(self, hwndList, fightType, layer):
         super(MouseController, self).__init__()
         self.mRunning = False
         self.mGameWindows = []
         hwndList.sort()
-        for i in range(len(hwndList)):
-            self.mGameWindows.append(gameWindow.GameWindow(hwndList[i][-1], i, fightType))
+        try:
+            for i in range(len(hwndList)):
+                self.mGameWindows.append(gameWindow.GameWindow(hwndList[i][-1], i, fightType, layer))
+        except:
+            self.mGameWindows = []
+            WriteErrorLog()
         self.mMouseCtrl = pms.PyMouse()
         instStopMouseController.signalEvent.connect(self.OnStopEvent)
 
@@ -59,14 +74,17 @@ class MouseController(QThread):
 
         self.mRunning = True
         while self.mRunning:
-            for i in range(len(self.mGameWindows)):
-                if i > 0: time.sleep(random.uniform(0.5, 0.8))
+            try:
+                for i in range(len(self.mGameWindows)):
+                    if i > 0: time.sleep(random.uniform(0.5, 0.8))
+                    if not self.mRunning: break
+                    self.mGameWindows[i].Update()
+                time.sleep(random.uniform(0.8, 1.2))
                 if not self.mRunning: break
-                self.mGameWindows[i].Update()
-            time.sleep(random.uniform(0.8, 1.2))
-            if not self.mRunning: break
-            self.mMouseCtrl.move(random.randint(100, rdW), random.randint(100, rdH))
-            time.sleep(random.uniform(0.8, 1.2))
+                self.mMouseCtrl.move(random.randint(100, rdW), random.randint(100, rdH))
+                time.sleep(random.uniform(0.8, 1.2))
+            except:
+                WriteErrorLog()
 
 
 if __name__ == '__main__':
