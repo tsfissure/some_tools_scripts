@@ -14,6 +14,10 @@ import aircv
 import cv2
 import pymouse
 
+POSITION_RANDOM_LEFT    = -20
+POSITION_RANDOM_RIGHT   = 20
+
+
 class GameWindow(object):
     def __init__(self, hwnd, windowOrder, fightType, layer = 0):
         """
@@ -30,8 +34,8 @@ class GameWindow(object):
         self.OnInit()
         self.InitPoints()
         self.LoadImages()
-        self.InitClickImages()
         self.mTansuoMoveCnt = 0
+        self.mErrorCount = 0
 
     def OnInit(self):
         self.mPath = "tmpFiles/%d/" % self.mWindowOrder #主要存储路径
@@ -39,28 +43,6 @@ class GameWindow(object):
             os.makedirs(self.mPath)
             win32api.SetFileAttributes("tmpFiles", win32con.FILE_ATTRIBUTE_HIDDEN)
         self.mScreenShotFileName = os.path.join(self.mPath, const.NAME_SCREEN_SHOT)
-
-    def InitClickImages(self):
-        self.mClickImages = []
-        if self.mFightType == const.FIGHT_TYPE_DUPLICATE:
-            self.mClickImages.append(const.NAME_CHALLENGE)
-            self.mClickImages.append(const.NAME_DUP_FIGHT)
-            self.mClickImages.append(const.NAME_AUTO_INVITE)
-            self.mClickImages.append(const.NAME_AUTO_ACCETP)
-        else:
-            self.mClickImages.append(const.NAME_TANSUO_BOX)
-            if 0 == self.mWindowOrder: # 司机
-            # if self.mFightType != const.FIGHT_TYPE_TANSUO_DOUBLE or 0 == self.mWindowOrder: # 司机
-                self.mClickImages.append(const.NAME_TANSUO)
-                self.mClickImages.append(const.NAME_TANSUO_BOSS)
-                self.mClickImages.append(const.NAME_TANSUO_FIGHT)
-                self.mClickImages.append(const.NAME_INVITE)
-            if self.mLayer > 0:
-                self.mClickImages.append("ts%s.png" % self.mLayer)
-        self.mClickImages.append(const.NAME_TASK)
-        self.mClickImages.append(const.NAME_READY_BTN)
-        self.mClickImages.append(const.NAME_CONFIRM)
-        self.mClickImages.append(const.NAME_ACCEPT)
 
     def InitPoints(self):
         """ 计算一些常量坐标 """
@@ -70,48 +52,75 @@ class GameWindow(object):
         self.mWindowHeight = height; self.mWindowWidth = width # 窗口宽和高
         self.mTSLeftMovePos = (int(self.mHwndLeftUpX + 100), int(self.mHwndLeftUpY + self.mWindowHeight * 3.0 / 4)) # 探索左移坐标
         self.mTSRightMovePos = (int(self.mHwndLeftUpX + self.mWindowWidth - 100), int(self.mHwndLeftUpY + self.mWindowHeight * 3.0 / 4)) # 探索右移坐标
-        # 没有操作时的点击,预防奖励把屏幕占满找不到可点的)
-        self.mNoOperatePos = (int(self.mHwndLeftUpX + 100), int(self.mWindowHeight * 0.82))
+        # 没有操作时的点击,预防奖励把屏幕占满找不到可点的)和省掉很多需要判断点击的界面
+        if self.mFightType == const.FIGHT_TYPE_TUPO:
+            self.mNoOperatePos = (int(self.mHwndLeftUpX + width * 0.2), int(self.mHwndLeftUpY + height * 0.76))
+            self.mTupoResetPos = (int(self.mHwndLeftUpX + 50), int(self.mHwndLeftUpY + height * 0.5))
+            self.mTupoType = const.TUPO_TYPE_UNKNOWN
+            self.mTupoReset = False
+        else:
+            self.mNoOperatePos = (int((self.mHwndLeftUpX * 2 + rect[2]) / 3.0), int(rect[3] - 20))
         # # 探索的时候如果在主界面，需要滚动，利用这个坐标滚动动
         # self.mTowerPos = (int(self.mHwndLeftUpX + width * 0.88), int(self.mHwndLeftUpY + height * 0.5))
 
     def LoadImageInternal(self, name):
-        """ LoadImages common """
+        """
+        LoadImages common
+        resize是因为游戏窗口会被玩家缩放
+        """
         img = cv2.imread(os.path.join("img/", name))
         H, W = img.shape[:2]
-        newSize = (int(self.mWindowWidth * W / 1152), int(self.mWindowHeight * H / 679))
+        newSize = (int(self.mWindowWidth * W / 1152), int(self.mWindowHeight * H / 678))
         newImg = cv2.resize(img, newSize, interpolation = cv2.INTER_AREA)
-        cv2.imwrite(os.path.join(self.mPath, name), newImg)
+        # cv2.imwrite(os.path.join(self.mPath, name), newImg)
+        return newImg
 
     def LoadImages(self):
         """
         把默认比例的图片经过resize后存到tmp/xx/目录下
-        resize是因为游戏窗口会被玩家缩放
+        再分类(要点击的，要判断的，先存起来)
         """
-        self.LoadImageInternal(const.NAME_TASK)
-        self.LoadImageInternal(const.NAME_ACCEPT)
-        self.LoadImageInternal(const.NAME_CONFIRM)
-        self.LoadImageInternal(const.NAME_READY_BTN)
-        if self.mFightType == const.FIGHT_TYPE_DUPLICATE:
-            self.LoadImageInternal(const.NAME_AUTO_INVITE)
-            self.LoadImageInternal(const.NAME_AUTO_ACCETP)
-            self.LoadImageInternal(const.NAME_CHALLENGE)
-            self.LoadImageInternal(const.NAME_DUP_FIGHT)
-        else:
-            self.LoadImageInternal(const.NAME_TANSUO_BOX)
-            # if self.mFightType != const.FIGHT_TYPE_TANSUO_DOUBLE or 0 == self.mWindowOrder: # 司机
+        self.mClickImages = []
+        if self.mFightType == const.FIGHT_TYPE_DUPLICATE or self.mFightType == const.FIGHT_TYPE_THREE_TEAM: # 自动接受要是接受前面
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_AUTO_ACCETP))    # 接受协作要很优先
+        self.mClickImages.append(self.LoadImageInternal(const.NAME_TASK))
+        if self.mFightType == const.FIGHT_TYPE_DUPLICATE: #副本
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_CHALLENGE))
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_DUP_FIGHT))
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_AUTO_INVITE))
+        elif self.mFightType == const.FIGHT_TYPE_TANSUO: #探索
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_TANSUO_BOX))
             if 0 == self.mWindowOrder: # 司机
-                self.LoadImageInternal(const.NAME_TANSUO)
-                self.LoadImageInternal(const.NAME_TANSUO_FIGHT)
-                self.LoadImageInternal(const.NAME_TANSUO_MAIN)
-                self.LoadImageInternal(const.NAME_TANSUO_BOSS)
-                self.LoadImageInternal(const.NAME_INVITE)
-                # self.LoadImageInternal(const.NAME_YUHUN_BTN)
+                self.mClickImages.append(self.LoadImageInternal(const.NAME_TANSUO))
+                self.mClickImages.append(self.LoadImageInternal(const.NAME_TANSUO_BOSS))
+                self.mClickImages.append(self.LoadImageInternal(const.NAME_TANSUO_FIGHT))
+                self.mClickImages.append(self.LoadImageInternal(const.NAME_INVITE))
+                self.mTowerMainSceneImg = self.LoadImageInternal(const.NAME_TANSUO_MAIN) #探索主场景
             if self.mLayer > 0:
-                self.LoadImageInternal("ts%d.png" % self.mLayer)
+                self.mClickImages.append(self.LoadImageInternal("ts%d.png" % self.mLayer))
+        elif self.mFightType == const.FIGHT_TYPE_THREE_TEAM: # 三人队
+            self.mThreeTeamFight = self.LoadImageInternal(const.NAME_DUP_FIGHT)
+            self.mThreeTeamInvite = self.LoadImageInternal(const.NAME_THREE_INVITE)
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_AUTO_INVITE))
+        elif self.mFightType == const.FIGHT_TYPE_TUPO: # 突破
+            self.mTupoAttack = self.LoadImageInternal(const.NAME_ATTCK)
+            self.mTupoRecord = self.LoadImageInternal(const.NAME_TUPO_REC)
+            self.mGuildTupo = self.LoadImageInternal(const.NAME_GUILD_TUPO)
+            self.mClickImages.append(self.mTupoAttack)
+            for i in range(5, -1, -1):
+                self.mClickImages.append(self.LoadImageInternal("tp%d.png" % i))
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_REFRESH))
+            self.mLockImg = self.LoadImageInternal(const.NAME_LOCK)
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_TUPO_BTN))
+        self.mClickImages.append(self.LoadImageInternal(const.NAME_READY_BTN))
+        self.mClickImages.append(self.LoadImageInternal(const.NAME_CONFIRM))
+        self.mClickImages.append(self.LoadImageInternal(const.NAME_ACCEPT))
 
     def ScreenShot(self):
-        """ 截图 网上找的代码直接复制修改的 """
+        """
+        截图 网上找的代码直接复制修改的
+        后面加了释放资源代码，网上找的
+        """
         hwndDC = win32gui.GetWindowDC(self.mHwnd)
         mfcDC = win32ui.CreateDCFromHandle(hwndDC)
         saveDC = mfcDC.CreateCompatibleDC()
@@ -121,6 +130,11 @@ class GameWindow(object):
         saveDC.BitBlt((0, 0), (self.mWindowWidth, self.mWindowHeight), mfcDC, (0, 0), win32con.SRCCOPY)
         saveBitMap.SaveBitmapFile(saveDC, self.mScreenShotFileName)
         self.mImageSrc = aircv.imread(self.mScreenShotFileName)
+        # release 
+        win32gui.DeleteObject(saveBitMap.GetHandle())
+        mfcDC.DeleteDC()
+        saveDC.DeleteDC()
+        win32gui.ReleaseDC(self.mHwnd, hwndDC)
 
     def TryMouseClick(self, X, Y):
         self.mMouseCtrl.click(X, Y, random.randint(1, 2))
@@ -128,47 +142,78 @@ class GameWindow(object):
     def TryMouseClickPos(self, pos):
         self.TryMouseClick(pos[0], pos[1])
 
-    def TryClick(self, imgName):
+    def TryClick(self, imgSch):
         """
         尝试点击，判断成功点击返回True
         """
-        rlt = aircv.find_template(self.mImageSrc, aircv.imread(os.path.join(self.mPath, imgName)))
+        rlt = aircv.find_template(self.mImageSrc, imgSch)
+        # rlt = aircv.find_template(self.mImageSrc, aircv.imread(os.path.join(self.mPath, imgName)))
         if not rlt: return False
         confidence = rlt["confidence"]
         if confidence >= 0.9:
-            # print("click", imgName, self.mWindowOrder, confidence)
+            # print("click", imgSch, self.mWindowOrder, confidence)
             pos = rlt["result"]
-            X = int(pos[0] + self.mHwndLeftUpX + random.randint(-10, 10))
+            X = int(pos[0] + self.mHwndLeftUpX + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
             Y = int(pos[1] + self.mHwndLeftUpY + random.randint(-5, 5))
             self.TryMouseClick(X, Y)
             return True
         return False
 
-    def CheckImageExists(self, imgName, click = False):
-        rlt = aircv.find_template(self.mImageSrc, aircv.imread(os.path.join(self.mPath, imgName)))
+    def CheckImageExists(self, imgSch, click = const.CHECK_CLICK_TYPE_NONE):
+        rlt = aircv.find_template(self.mImageSrc, imgSch)
         if not rlt: return False
         if rlt["confidence"] >= 0.9:
-            if click:
+            if click == const.CHECK_CLICK_TYPE_UP:
                 rect = rlt["rectangle"]
-                X = int(rect[0][0] + self.mHwndLeftUpX + random.randint(-10, 10))
+                X = int(rect[0][0] + self.mHwndLeftUpX + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
                 Y = int(rect[0][1] - 20 + self.mHwndLeftUpY + random.randint(-5, 5))
+                self.TryMouseClick(X, Y)
+            elif click == const.CHECK_CLICK_TYPE_CENTER:
+                pos = rlt["result"]
+                X = int(pos[0] + self.mHwndLeftUpX + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
+                Y = int(pos[1] + self.mHwndLeftUpY + random.randint(-5, 5))
                 self.TryMouseClick(X, Y)
             return True
         return False
 
+    def UpdateTupo(self):
+        """突破比较特殊处理"""
+        if self.mFightType != const.FIGHT_TYPE_TUPO: return False
+        if self.mTupoReset:
+            self.mTupoReset = False
+            self.TryMouseClickPos(self.mTupoResetPos)
+            return True
+
+        if self.mTupoType == const.TUPO_TYPE_UNKNOWN:
+            if self.CheckImageExists(self.mTupoRecord):
+                self.mTupoType = const.TUPO_TYPE_GUILD
+            else:
+                self.mTupoType = const.TUPO_TYPE_PERSON
+        if self.mTupoType == const.TUPO_TYPE_GUILD:
+            if self.TryClick(self.mGuildTupo):
+                return True
+            if self.CheckImageExists(self.mTupoAttack) and random.randint(1, 5) == 1: # 五分之一的概率回到界面重新获得新的寮突数据
+                self.mTupoReset = True
+                self.TryMouseClickPos(self.mNoOperatePos)
+                return True
+        return False
+
     def Update(self):
-        self.ScreenShot()
+        if self.mErrorCount >= 100: return
         try:
+            win32gui.SetForegroundWindow(self.mHwnd)
+            self.ScreenShot()
+            if self.UpdateTupo(): return
             for img in self.mClickImages:
                 if self.TryClick(img):
                     self.mTansuoMoveCnt = 0
                     break
             else:
                 if self.mFightType == const.FIGHT_TYPE_TANSUO:
-                    if 0 == self.mWindowOrder and self.CheckImageExists(const.NAME_TANSUO_MAIN): #探索的时候在主界面，移动
+                    if 0 == self.mWindowOrder and self.CheckImageExists(self.mTowerMainSceneImg): #探索的时候在主界面，移动
                         # print("探索主界面", self.mWindowOrder)
                         self.mTansuoMoveCnt += 1
-                        if 1 == (int(self.mTansuoMoveCnt / 5) & 1):
+                        if 1 == (int(self.mTansuoMoveCnt / 8) & 1):
                             self.TryMouseClickPos(self.mTSLeftMovePos)
                         else:
                             self.TryMouseClickPos(self.mTSRightMovePos)
@@ -182,20 +227,29 @@ class GameWindow(object):
                 elif self.mFightType == const.FIGHT_TYPE_DUPLICATE:
                     # print("界面左下方", self.mWindowOrder)
                     self.TryMouseClickPos(self.mNoOperatePos)
+                elif self.mFightType == const.FIGHT_TYPE_THREE_TEAM:
+                    # 在组队界面不需要操作, 直到没有"邀请"
+                    if not self.CheckImageExists(self.mThreeTeamInvite) and not self.CheckImageExists(self.mThreeTeamFight, const.CHECK_CLICK_TYPE_CENTER):
+                        self.TryMouseClickPos(self.mNoOperatePos)
+                elif self.mFightType == const.FIGHT_TYPE_TUPO:
+                    if not self.CheckImageExists(self.mLockImg):
+                        self.TryMouseClickPos(self.mNoOperatePos)
         except:
             ctrller.WriteErrorLog()
+            self.mErrorCount += 1
 
 # instance = GameWindow(0, 1)
 
 if __name__ == '__main__':
-    while True:
-        x = eval(input('input:'))
-        if 0 == x:
-            break
-        else:
-            try:
-                instance.ScreenShot()
-            except:
-                traceback.print_exc(5)
+    pass
+    # while True:
+    #     x = eval(input('input:'))
+    #     if 0 == x:
+    #         break
+    #     else:
+    #         try:
+    #             instance.ScreenShot()
+    #         except:
+    #             traceback.print_exc(5)
 
 

@@ -6,7 +6,7 @@ Created on 2019/6/6 9:58:31
 '''
 
 import time, os, traceback
-import pymouse as pms
+import pymouse
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from pynput import keyboard
 import random
@@ -61,7 +61,7 @@ class MouseController(QThread):
         except:
             self.mGameWindows = []
             WriteErrorLog()
-        self.mMouseCtrl = pms.PyMouse()
+        self.mMouseCtrl = pymouse.PyMouse()
         instStopMouseController.signalEvent.connect(self.OnStopEvent)
 
     def OnStopEvent(self):
@@ -76,13 +76,13 @@ class MouseController(QThread):
         while self.mRunning:
             try:
                 for i in range(len(self.mGameWindows)):
-                    if i > 0: time.sleep(random.uniform(0.5, 0.8))
+                    if i > 0: time.sleep(random.uniform(0.3, 0.6))
                     if not self.mRunning: break
                     self.mGameWindows[i].Update()
-                time.sleep(random.uniform(0.8, 1.2))
+                time.sleep(random.uniform(0.2, 0.5))
                 if not self.mRunning: break
                 self.mMouseCtrl.move(random.randint(100, rdW), random.randint(100, rdH))
-                time.sleep(random.uniform(0.8, 1.2))
+                time.sleep(random.uniform(0.2, 0.5))
             except:
                 WriteErrorLog()
 

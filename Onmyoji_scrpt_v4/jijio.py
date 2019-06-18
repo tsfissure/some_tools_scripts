@@ -14,13 +14,15 @@ import win32api
 import const
 import ctypes
 
-WINDOW_WIDTH    = 500
+WINDOW_WIDTH    = 600
 WINDOW_HEIGHT   = 200
 
 POSX_DUP        = 30    # 副本按钮位置
-POSX_TOWER_2    = 150   # 多人探索按钮位置
-POSX_BOX        = 300   # 下拉列表位置
-POSX_TOWER      = 370   # 探索按钮位置
+POSX_THREE_TEAM = POSX_DUP + 100   # 三人副本按钮位置
+POSX_TUPO       = POSX_THREE_TEAM + 100   # 突破
+# POSX_TOWER_2    = 150   # 多人探索按钮位置
+POSX_BOX        = WINDOW_WIDTH - 200    # 下拉列表位置
+POSX_TOWER      = POSX_BOX + 70   # 探索按钮位置
 
 class JiJioGUI(QMainWindow):
 
@@ -64,11 +66,10 @@ class JiJioGUI(QMainWindow):
                 self.OnMessage("失败! 请在3s后重试")
                 return
             hwndList = []
-            yysTitle = "阴阳师-网易游戏"
             def callback(hwnd, mouse):
                 if IsWindow(hwnd) and IsWindowEnabled(hwnd) and IsWindowVisible(hwnd):
                     title = GetWindowText(hwnd)
-                    if yysTitle in title:
+                    if const.NAME_WINDOW_TITLE in title:
                         rect = list(GetWindowRect(hwnd))
                         rect.append(hwnd)
                         hwndList.append(rect)
@@ -76,8 +77,8 @@ class JiJioGUI(QMainWindow):
             if len(hwndList) < 1:
                 self.OnMessage("未找到游戏窗口,请先打开游戏到特定界面")
                 return
-            if len(hwndList) > 2:
-                self.OnMessage("游戏窗口过多")
+            if len(hwndList) > 3:
+                self.OnMessage("游戏窗口过多,目前最多三个")
                 return
             layer = self.mTowerDropList[self.mTowerDropBox.currentIndex()] if fightType == const.FIGHT_TYPE_TANSUO and 1 == len(hwndList) else 0 #探索的章节
             if self.mStopThread: self.mStopThread = None
@@ -94,7 +95,7 @@ class JiJioGUI(QMainWindow):
             self.OnMessage("执行出错,请查看日志")
 
     def AddDuplicateButton(self):
-        self.mDupBtn = QPushButton("副本", self)
+        self.mDupBtn = QPushButton("单双人本", self)
         self.mDupBtn.move(POSX_DUP, WINDOW_HEIGHT - 40)
         self.mDupBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_DUPLICATE))
 
@@ -119,22 +120,37 @@ class JiJioGUI(QMainWindow):
         self.mTowerDropBox.move(POSX_BOX, WINDOW_HEIGHT - 40)
         self.mTowerDropBox.currentIndexChanged.connect(lambda index: self.OnMessage("已选择:探索第%d章(单人探索生效)" % self.mTowerDropList[index]))
 
+    def AddThreeTream(self):
+        """三人队伍按钮"""
+        self.mThreeBtn = QPushButton("三人副本", self)
+        self.mThreeBtn.move(POSX_THREE_TEAM, WINDOW_HEIGHT - 40)
+        self.mThreeBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_THREE_TEAM))
+
+    def AddTupoButton(self):
+        """突破"""
+        self.mTupoBtn = QPushButton("突破", self)
+        self.mTupoBtn.move(POSX_TUPO, WINDOW_HEIGHT - 40)
+        self.mTupoBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_TUPO))
+
     def OnInitUI(self):
         self.AddTextBrowser()
         self.AddDuplicateButton()
         self.AddTowerButton()
         # self.AddTowerDoubleButton()
         self.AddTowerDropList()
+        self.AddThreeTream()
+        self.AddTupoButton()
 
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setWindowIcon(QIcon('img/fav.ico'))
         self.OnMessage("初始化成功")
+        self.OnMessage("副本包括(御魂,觉醒,业原火,御灵)")
         if len(self.mTowerDropList) > 0:
             self.OnMessage("已选择:探索第%d章(单人探索生效)" % self.mTowerDropList[self.mTowerDropBox.currentIndex()])
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("鸡jio v4.0")
+    app.setApplicationName("鸡jio v4.2")
     try:
         window = JiJioGUI()
     except:
