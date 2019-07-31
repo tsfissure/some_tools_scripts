@@ -9,10 +9,15 @@ import controller as ctrller
 import const
 import os, random
 import traceback
-import win32gui, win32ui, win32con, win32api
+from win32gui import GetWindowRect, GetWindowDC, ReleaseDC, DeleteObject, SetForegroundWindow
+from win32ui import CreateDCFromHandle, CreateBitmap
+from win32con import FILE_ATTRIBUTE_HIDDEN, SRCCOPY
+from win32api import SetFileAttributes
 import aircv
 import cv2
-import pymouse
+from pymouse import PyMouse
+from PIL import ImageGrab
+import time
 
 POSITION_RANDOM_LEFT    = -20
 POSITION_RANDOM_RIGHT   = 20
@@ -30,7 +35,7 @@ class GameWindow(object):
         self.mWindowOrder = windowOrder # 窗口顺序,探索组队时司机要在左边(order为0)
         self.mFightType = fightType
         self.mLayer = layer
-        self.mMouseCtrl = pymouse.PyMouse()
+        self.mMouseCtrl = PyMouse()
         self.OnInit()
         self.InitPoints()
         self.LoadImages()
@@ -41,12 +46,14 @@ class GameWindow(object):
         self.mPath = "tmpFiles/%d/" % self.mWindowOrder #主要存储路径
         if not os.path.exists(self.mPath):
             os.makedirs(self.mPath)
-            win32api.SetFileAttributes("tmpFiles", win32con.FILE_ATTRIBUTE_HIDDEN)
+            SetFileAttributes("tmpFiles", FILE_ATTRIBUTE_HIDDEN)
         self.mScreenShotFileName = os.path.join(self.mPath, const.NAME_SCREEN_SHOT)
 
     def InitPoints(self):
         """ 计算一些常量坐标 """
-        rect = win32gui.GetWindowRect(self.mHwnd)
+        rect = GetWindowRect(self.mHwnd)
+        self.mHwndRect = rect
+        self.mUseSystemScreenShot = rect[0] > 2000 # 多屏
         self.mHwndLeftUpX, self.mHwndLeftUpY = rect[:2] # 窗口左上角坐标
         height, width = rect[3] - rect[1], rect[2] - rect[0]
         self.mWindowHeight = height; self.mWindowWidth = width # 窗口宽和高
@@ -58,6 +65,9 @@ class GameWindow(object):
             self.mTupoResetPos = (int(self.mHwndLeftUpX + 50), int(self.mHwndLeftUpY + height * 0.5))
             self.mTupoType = const.TUPO_TYPE_UNKNOWN
             self.mTupoReset = False
+            self.mCantGuidTupo = False # 能不能打寮突破
+            self.mCantPersonTupo = False # 能不能打个突
+            self.mNextAttackTick = 0 # 寮突没有可打次数等待时间
         else:
             self.mNoOperatePos = (int((self.mHwndLeftUpX * 2 + rect[2]) / 3.0), int(rect[3] - 20))
         # # 探索的时候如果在主界面，需要滚动，利用这个坐标滚动动
@@ -83,7 +93,8 @@ class GameWindow(object):
         self.mClickImages = []
         if self.mFightType == const.FIGHT_TYPE_DUPLICATE or self.mFightType == const.FIGHT_TYPE_THREE_TEAM: # 自动接受要是接受前面
             self.mClickImages.append(self.LoadImageInternal(const.NAME_AUTO_ACCETP))    # 接受协作要很优先
-        self.mClickImages.append(self.LoadImageInternal(const.NAME_TASK))
+        self.mTaskImg = self.LoadImageInternal(const.NAME_TASK)
+        self.mClickImages.append(self.mTaskImg)
         if self.mFightType == const.FIGHT_TYPE_DUPLICATE: #副本
             self.mClickImages.append(self.LoadImageInternal(const.NAME_CHALLENGE))
             self.mClickImages.append(self.LoadImageInternal(const.NAME_DUP_FIGHT))
@@ -112,6 +123,12 @@ class GameWindow(object):
             self.mClickImages.append(self.LoadImageInternal(const.NAME_REFRESH))
             self.mLockImg = self.LoadImageInternal(const.NAME_LOCK)
             self.mClickImages.append(self.LoadImageInternal(const.NAME_TUPO_BTN))
+            self.mCantGuildTupoImg = self.LoadImageInternal(const.NAME_CANT_GUILD_TUPO)
+            self.mCantPersonTupoImg = self.LoadImageInternal(const.NAME_CANT_PERSON_TUPO)
+        elif self.mFightType == const.FIGHT_TYPE_TUZIJING:
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_TUZIJING))
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_DUP_FIGHT))
+            self.mClickImages.append(self.LoadImageInternal(const.NAME_AUTO_INVITE))
         self.mClickImages.append(self.LoadImageInternal(const.NAME_READY_BTN))
         self.mClickImages.append(self.LoadImageInternal(const.NAME_CONFIRM))
         self.mClickImages.append(self.LoadImageInternal(const.NAME_ACCEPT))
@@ -121,26 +138,33 @@ class GameWindow(object):
         截图 网上找的代码直接复制修改的
         后面加了释放资源代码，网上找的
         """
-        hwndDC = win32gui.GetWindowDC(self.mHwnd)
-        mfcDC = win32ui.CreateDCFromHandle(hwndDC)
+        hwndDC = GetWindowDC(self.mHwnd)
+        mfcDC = CreateDCFromHandle(hwndDC)
         saveDC = mfcDC.CreateCompatibleDC()
-        saveBitMap = win32ui.CreateBitmap()
+        saveBitMap = CreateBitmap()
         saveBitMap.CreateCompatibleBitmap(mfcDC, self.mWindowWidth, self.mWindowHeight)
         saveDC.SelectObject(saveBitMap)
-        saveDC.BitBlt((0, 0), (self.mWindowWidth, self.mWindowHeight), mfcDC, (0, 0), win32con.SRCCOPY)
+        saveDC.BitBlt((0, 0), (self.mWindowWidth, self.mWindowHeight), mfcDC, (0, 0), SRCCOPY)
         saveBitMap.SaveBitmapFile(saveDC, self.mScreenShotFileName)
         self.mImageSrc = aircv.imread(self.mScreenShotFileName)
         # release 
-        win32gui.DeleteObject(saveBitMap.GetHandle())
+        DeleteObject(saveBitMap.GetHandle())
         mfcDC.DeleteDC()
         saveDC.DeleteDC()
-        win32gui.ReleaseDC(self.mHwnd, hwndDC)
+        ReleaseDC(self.mHwnd, hwndDC)
+
+    def ScreenShotPIL(self):
+        im = ImageGrab.grab(self.mHwndRect)
+        im.save(self.mScreenShotFileName)
+        self.mImageSrc = aircv.imread(self.mScreenShotFileName)
 
     def TryMouseClick(self, X, Y):
         self.mMouseCtrl.click(X, Y, random.randint(1, 2))
 
     def TryMouseClickPos(self, pos):
-        self.TryMouseClick(pos[0], pos[1])
+        X = int(pos[0] + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
+        Y = int(pos[1] + random.randint(-5, 5))
+        self.TryMouseClick(X, Y)
 
     def TryClick(self, imgSch):
         """
@@ -198,12 +222,33 @@ class GameWindow(object):
                 return True
         return False
 
+    def UpdateCantTupo(self): # 等待突破(没次数了就不用一直点点点)
+        if self.mFightType != const.FIGHT_TYPE_TUPO: return False
+        if self.mTupoType == const.TUPO_TYPE_GUILD:
+            now = int(time.time())
+            if self.mCantGuidTupo and now >= self.mNextAttackTick:
+                self.mCantGuidTupo = False
+            if not self.mCantGuidTupo and self.CheckImageExists(self.mCantGuildTupoImg):
+                    self.mNextAttackTick = now + 30 # 等待半分钟
+                    self.mCantGuidTupo = True
+            return self.mCantGuidTupo
+        elif self.mTupoType == const.TUPO_TYPE_PERSON:
+            if not self.mCantPersonTupo and self.CheckImageExists(self.mCantPersonTupoImg):
+                self.mCantPersonTupo = True
+            return False #self.mCantPersonTupo
+        return False
+
     def Update(self):
         if self.mErrorCount >= 100: return
         try:
-            win32gui.SetForegroundWindow(self.mHwnd)
-            self.ScreenShot()
-            if self.UpdateTupo(): return
+            SetForegroundWindow(self.mHwnd)
+            if self.mUseSystemScreenShot:
+                self.ScreenShot()
+            else:
+                self.ScreenShotPIL()
+            if self.UpdateTupo() or self.UpdateCantTupo():
+                self.TryClick(self.mTaskImg)
+                return
             for img in self.mClickImages:
                 if self.TryClick(img):
                     self.mTansuoMoveCnt = 0
@@ -224,7 +269,7 @@ class GameWindow(object):
                     else:
                         # print("左下方", self.mWindowOrder)
                         self.TryMouseClickPos(self.mNoOperatePos)
-                elif self.mFightType == const.FIGHT_TYPE_DUPLICATE:
+                elif self.mFightType == const.FIGHT_TYPE_DUPLICATE or self.mFightType == const.FIGHT_TYPE_TUZIJING:
                     # print("界面左下方", self.mWindowOrder)
                     self.TryMouseClickPos(self.mNoOperatePos)
                 elif self.mFightType == const.FIGHT_TYPE_THREE_TEAM:

@@ -1,3 +1,3 @@
-pyinstaller .\jijio.py -Fw --hidden-import=queue -i img\fav.ico -n ¼¦½Å
+pyinstaller .\jijio.py -Fw -i img\fav.ico -n ¼¦½Å
 pause
 

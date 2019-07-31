@@ -9,13 +9,14 @@ import controller as ctrller
 import sys, traceback, time, os
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTextBrowser, QPushButton, QComboBox
 from PyQt5.QtGui import QFont, QIcon
-from win32gui import *
-import win32api
+from win32gui import IsWindow, IsWindowEnabled, IsWindowVisible, GetWindowText, GetWindowRect, EnumWindows
+from win32api import ShellExecute
+from win32com.client import Dispatch as wcdp
 import const
 import ctypes
 
-WINDOW_WIDTH    = 600
-WINDOW_HEIGHT   = 200
+WINDOW_WIDTH    = 550
+WINDOW_HEIGHT   = 220
 
 POSX_DUP        = 30    # 副本按钮位置
 POSX_THREE_TEAM = POSX_DUP + 100   # 三人副本按钮位置
@@ -23,6 +24,8 @@ POSX_TUPO       = POSX_THREE_TEAM + 100   # 突破
 # POSX_TOWER_2    = 150   # 多人探索按钮位置
 POSX_BOX        = WINDOW_WIDTH - 200    # 下拉列表位置
 POSX_TOWER      = POSX_BOX + 70   # 探索按钮位置
+FIRST_LINE_SUBER = 80
+SECOND_LINE_SUBER = 40
 
 class JiJioGUI(QMainWindow):
 
@@ -41,7 +44,7 @@ class JiJioGUI(QMainWindow):
 
     def AddTextBrowser(self):
         self.textBrowser = QTextBrowser(self)
-        self.textBrowser.resize(WINDOW_WIDTH - 60, WINDOW_HEIGHT - 70)
+        self.textBrowser.resize(WINDOW_WIDTH - 60, WINDOW_HEIGHT - FIRST_LINE_SUBER - 30)
         self.textBrowser.move(30, 20)
         font = QFont("Courier New")
         font.setPointSize(8)
@@ -62,7 +65,7 @@ class JiJioGUI(QMainWindow):
             if self.mRunning:
                 self.OnMessage("正在进行控制，请先按<Esc>键停止控制")
                 return
-            if int(time.time()) - self.mLastStopTick < 5:
+            if int(time.time()) - self.mLastStopTick < 3:
                 self.OnMessage("失败! 请在3s后重试")
                 return
             hwndList = []
@@ -96,17 +99,17 @@ class JiJioGUI(QMainWindow):
 
     def AddDuplicateButton(self):
         self.mDupBtn = QPushButton("单双人本", self)
-        self.mDupBtn.move(POSX_DUP, WINDOW_HEIGHT - 40)
+        self.mDupBtn.move(POSX_DUP, WINDOW_HEIGHT - FIRST_LINE_SUBER)
         self.mDupBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_DUPLICATE))
 
     def AddTowerButton(self):
         self.mTowerBtn = QPushButton("探索", self)
-        self.mTowerBtn.move(POSX_TOWER, WINDOW_HEIGHT - 40)
+        self.mTowerBtn.move(POSX_TOWER, WINDOW_HEIGHT - FIRST_LINE_SUBER)
         self.mTowerBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_TANSUO))
 
     def AddTowerDoubleButton(self):
         self.mTowerDoubleBtn = QPushButton("多人探索", self)
-        self.mTowerBtn.move(POSX_TOWER_2, WINDOW_HEIGHT - 40)
+        self.mTowerBtn.move(POSX_TOWER_2, WINDOW_HEIGHT - FIRST_LINE_SUBER)
         self.mTowerBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_TANSUO_DOUBLE))
 
     def AddTowerDropList(self):
@@ -117,20 +120,26 @@ class JiJioGUI(QMainWindow):
         self.mTowerDropBox = QComboBox(self)
         self.mTowerDropBox.addItems(["第%d章" % i for i in self.mTowerDropList])
         self.mTowerDropBox.resize(65, self.mTowerBtn.size().height())
-        self.mTowerDropBox.move(POSX_BOX, WINDOW_HEIGHT - 40)
+        self.mTowerDropBox.move(POSX_BOX, WINDOW_HEIGHT - FIRST_LINE_SUBER)
         self.mTowerDropBox.currentIndexChanged.connect(lambda index: self.OnMessage("已选择:探索第%d章(单人探索生效)" % self.mTowerDropList[index]))
 
     def AddThreeTream(self):
         """三人队伍按钮"""
         self.mThreeBtn = QPushButton("三人副本", self)
-        self.mThreeBtn.move(POSX_THREE_TEAM, WINDOW_HEIGHT - 40)
+        self.mThreeBtn.move(POSX_THREE_TEAM, WINDOW_HEIGHT - FIRST_LINE_SUBER)
         self.mThreeBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_THREE_TEAM))
 
     def AddTupoButton(self):
         """突破"""
         self.mTupoBtn = QPushButton("突破", self)
-        self.mTupoBtn.move(POSX_TUPO, WINDOW_HEIGHT - 40)
+        self.mTupoBtn.move(POSX_TUPO, WINDOW_HEIGHT - FIRST_LINE_SUBER)
         self.mTupoBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_TUPO))
+
+    def AddTuziJingButton(self):
+        """兔子精"""
+        self.mTuziBtn = QPushButton("兔子精", self)
+        self.mTuziBtn.move(POSX_DUP, WINDOW_HEIGHT - SECOND_LINE_SUBER)
+        self.mTuziBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_TUZIJING))
 
     def OnInitUI(self):
         self.AddTextBrowser()
@@ -140,6 +149,7 @@ class JiJioGUI(QMainWindow):
         self.AddTowerDropList()
         self.AddThreeTream()
         self.AddTupoButton()
+        self.AddTuziJingButton()
 
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setWindowIcon(QIcon('img/fav.ico'))
@@ -150,8 +160,10 @@ class JiJioGUI(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("鸡jio v4.2")
+    app.setApplicationName("鸡jio v4.6(兔子精版本)")
     try:
+        shell = wcdp("WScript.Shell") # 窗口置顶，有这个不会失败
+        shell.SendKeys('%')
         window = JiJioGUI()
     except:
         ctrller.WriteErrorLog()
@@ -162,7 +174,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         try:
             if not ctypes.windll.shell32.IsUserAnAdmin():
-                win32api.ShellExecute(None, u'runas', sys.executable, __file__, None, 1)
+                ShellExecute(None, u'runas', sys.executable, __file__, None, 1)
                 sys.exit(0)
         except:
             sys.exit(0)

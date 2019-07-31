@@ -10,6 +10,7 @@ FIGHT_TYPE_TANSUO           = 2     # 探索
 # FIGHT_TYPE_TANSUO_DOUBLE    = 3     # 多人探索
 FIGHT_TYPE_THREE_TEAM       = 4     # 三人队伍
 FIGHT_TYPE_TUPO             = 5     # 突破
+FIGHT_TYPE_TUZIJING         = 6     # 突破
 
 NAME_WINDOW_TITLE           = "阴阳师-网易游戏"
 NAME_SCREEN_SHOT            = "screen.png"
@@ -35,6 +36,9 @@ NAME_REFRESH                = "refresh.png"     # 刷新
 NAME_GUILD_TUPO             = "guildtp.png"     # 寮突破
 NAME_TUPO_REC               = "tprec.png"       # 寮突破记录
 NAME_TUPO_BTN               = "tupo.png"        # 探索界面的突破按钮
+NAME_CANT_GUILD_TUPO        = "cantgt.png"      # 不能打寮突破(没次数)
+NAME_CANT_PERSON_TUPO       = "cantpt.png"      # 不能打个突破(没门票)
+NAME_TUZIJING               = "tuzij.png"       # 兔子精(刷石头那个活动)
 
 # 检测图片是否存在时，如果存在按照不同类型点击
 CHECK_CLICK_TYPE_NONE       = 0
