@@ -76,13 +76,13 @@ class MouseController(QThread):
         while self.mRunning:
             try:
                 for i in range(len(self.mGameWindows)):
-                    if i > 0: time.sleep(random.uniform(0.3, 0.6))
+                    if i > 0: time.sleep(random.uniform(0.4, 0.7))
                     if not self.mRunning: break
                     self.mGameWindows[i].Update()
-                time.sleep(random.uniform(0.3, 0.6))
+                time.sleep(random.uniform(0.4, 0.7))
                 if not self.mRunning: break
                 self.mMouseCtrl.move(random.randint(100, rdW), random.randint(100, rdH))
-                time.sleep(random.uniform(0.3, 0.6))
+                time.sleep(random.uniform(0.4, 0.7))
             except:
                 WriteErrorLog()
 

@@ -160,7 +160,7 @@ class JiJioGUI(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("鸡jio v4.6(兔子精版本)")
+    app.setApplicationName("鸡jio v4.8")
     try:
         shell = wcdp("WScript.Shell") # 窗口置顶，有这个不会失败
         shell.SendKeys('%')

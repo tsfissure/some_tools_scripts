@@ -16,11 +16,13 @@ from win32api import SetFileAttributes
 import aircv
 import cv2
 from pymouse import PyMouse
-from PIL import ImageGrab
+# from PIL import ImageGrab
 import time
 
-POSITION_RANDOM_LEFT    = -20
-POSITION_RANDOM_RIGHT   = 20
+POSITION_RANDOM_LEFT    = -30
+POSITION_RANDOM_RIGHT   = 30
+POSITION_RANDOM_UP      = -10
+POSITION_RANDOM_DOWN    = 10
 
 
 class GameWindow(object):
@@ -120,7 +122,7 @@ class GameWindow(object):
             self.mClickImages.append(self.mTupoAttack)
             for i in range(5, -1, -1):
                 self.mClickImages.append(self.LoadImageInternal("tp%d.png" % i))
-            self.mClickImages.append(self.LoadImageInternal(const.NAME_REFRESH))
+            # self.mClickImages.append(self.LoadImageInternal(const.NAME_REFRESH))
             self.mLockImg = self.LoadImageInternal(const.NAME_LOCK)
             self.mClickImages.append(self.LoadImageInternal(const.NAME_TUPO_BTN))
             self.mCantGuildTupoImg = self.LoadImageInternal(const.NAME_CANT_GUILD_TUPO)
@@ -163,7 +165,7 @@ class GameWindow(object):
 
     def TryMouseClickPos(self, pos):
         X = int(pos[0] + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
-        Y = int(pos[1] + random.randint(-5, 5))
+        Y = int(pos[1] + random.randint(POSITION_RANDOM_UP, POSITION_RANDOM_DOWN))
         self.TryMouseClick(X, Y)
 
     def TryClick(self, imgSch):
@@ -178,7 +180,7 @@ class GameWindow(object):
             # print("click", imgSch, self.mWindowOrder, confidence)
             pos = rlt["result"]
             X = int(pos[0] + self.mHwndLeftUpX + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
-            Y = int(pos[1] + self.mHwndLeftUpY + random.randint(-5, 5))
+            Y = int(pos[1] + self.mHwndLeftUpY + random.randint(POSITION_RANDOM_UP, POSITION_RANDOM_DOWN))
             self.TryMouseClick(X, Y)
             return True
         return False
@@ -190,12 +192,12 @@ class GameWindow(object):
             if click == const.CHECK_CLICK_TYPE_UP:
                 rect = rlt["rectangle"]
                 X = int(rect[0][0] + self.mHwndLeftUpX + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
-                Y = int(rect[0][1] - 20 + self.mHwndLeftUpY + random.randint(-5, 5))
+                Y = int(rect[0][1] - 20 + self.mHwndLeftUpY + random.randint(POSITION_RANDOM_UP, POSITION_RANDOM_DOWN))
                 self.TryMouseClick(X, Y)
             elif click == const.CHECK_CLICK_TYPE_CENTER:
                 pos = rlt["result"]
                 X = int(pos[0] + self.mHwndLeftUpX + random.randint(POSITION_RANDOM_LEFT, POSITION_RANDOM_RIGHT))
-                Y = int(pos[1] + self.mHwndLeftUpY + random.randint(-5, 5))
+                Y = int(pos[1] + self.mHwndLeftUpY + random.randint(POSITION_RANDOM_UP, POSITION_RANDOM_DOWN))
                 self.TryMouseClick(X, Y)
             return True
         return False
@@ -241,11 +243,12 @@ class GameWindow(object):
     def Update(self):
         if self.mErrorCount >= 100: return
         try:
-            SetForegroundWindow(self.mHwnd)
-            if self.mUseSystemScreenShot:
-                self.ScreenShot()
-            else:
-                self.ScreenShotPIL()
+            # SetForegroundWindow(self.mHwnd)
+            # if self.mUseSystemScreenShot:
+            #     self.ScreenShot()
+            # else:
+            #     self.ScreenShotPIL()
+            self.ScreenShot()
             if self.UpdateTupo() or self.UpdateCantTupo():
                 self.TryClick(self.mTaskImg)
                 return
