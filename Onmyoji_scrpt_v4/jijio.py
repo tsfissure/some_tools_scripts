@@ -7,7 +7,7 @@ Created on 2019/6/5 20:20:45
 
 import controller as ctrller
 import sys, traceback, time, os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTextBrowser, QPushButton, QComboBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTextBrowser, QPushButton, QComboBox, QLineEdit, QLabel
 from PyQt5.QtGui import QFont, QIcon
 from win32gui import IsWindow, IsWindowEnabled, IsWindowVisible, GetWindowText, GetWindowRect, EnumWindows
 from win32api import ShellExecute
@@ -68,6 +68,11 @@ class JiJioGUI(QMainWindow):
             if int(time.time()) - self.mLastStopTick < 3:
                 self.OnMessage("失败! 请在3s后重试")
                 return
+            period = int(self.mLineEdit.text())
+            if period > 60 or period < 1:
+                self.OnMessage("大于一小时，小心封号!!!!!!!!!!!")
+            if period < 1:
+                period = 864000
             hwndList = []
             def callback(hwnd, mouse):
                 if IsWindow(hwnd) and IsWindowEnabled(hwnd) and IsWindowVisible(hwnd):
@@ -89,7 +94,7 @@ class JiJioGUI(QMainWindow):
             self.mStopThread.signalEvent.connect(self.OnStopEvent)
             self.mStopThread.start()
             if self.mMouseThread: self.mMouseThread = None
-            self.mMouseThread = ctrller.MouseController(hwndList, fightType, layer)
+            self.mMouseThread = ctrller.MouseController(hwndList, fightType, layer, period * 60)
             self.mMouseThread.start()
             self.mRunning = True
             self.OnMessage("开始控制")
@@ -141,6 +146,15 @@ class JiJioGUI(QMainWindow):
         self.mTuziBtn.move(POSX_DUP, WINDOW_HEIGHT - SECOND_LINE_SUBER)
         self.mTuziBtn.clicked.connect(lambda : self.OnStart(const.FIGHT_TYPE_TUZIJING))
 
+    def AddRunPeriod(self):
+        self.mLineEdit = QLineEdit(self)
+        self.mMinute = QLabel(self)
+        self.mMinute.setText("刷多少分钟：")
+        self.mLineEdit.move(POSX_BOX + 80, WINDOW_HEIGHT - SECOND_LINE_SUBER)
+        self.mLineEdit.resize(60, self.mLineEdit.size().height())
+        self.mLineEdit.setText("60")
+        self.mMinute.move(POSX_BOX, WINDOW_HEIGHT - SECOND_LINE_SUBER)
+
     def OnInitUI(self):
         self.AddTextBrowser()
         self.AddDuplicateButton()
@@ -150,6 +164,7 @@ class JiJioGUI(QMainWindow):
         self.AddThreeTream()
         self.AddTupoButton()
         self.AddTuziJingButton()
+        self.AddRunPeriod()
 
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setWindowIcon(QIcon('img/fav.ico'))
@@ -160,7 +175,7 @@ class JiJioGUI(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("鸡jio v4.8")
+    app.setApplicationName("鸡jio v4.9")
     try:
         shell = wcdp("WScript.Shell") # 窗口置顶，有这个不会失败
         shell.SendKeys('%')

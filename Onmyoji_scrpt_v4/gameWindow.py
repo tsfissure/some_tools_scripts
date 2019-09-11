@@ -13,11 +13,13 @@ from win32gui import GetWindowRect, GetWindowDC, ReleaseDC, DeleteObject, SetFor
 from win32ui import CreateDCFromHandle, CreateBitmap
 from win32con import FILE_ATTRIBUTE_HIDDEN, SRCCOPY
 from win32api import SetFileAttributes
+from win32process import GetWindowThreadProcessId
 import aircv
 import cv2
 from pymouse import PyMouse
 # from PIL import ImageGrab
 import time
+import psutil
 
 POSITION_RANDOM_LEFT    = -30
 POSITION_RANDOM_RIGHT   = 30
@@ -239,6 +241,11 @@ class GameWindow(object):
                 self.mCantPersonTupo = True
             return False #self.mCantPersonTupo
         return False
+
+    def KillSelf(self):
+        _, PID = GetWindowThreadProcessId(self.mHwnd)
+        p = psutil.Process(PID)
+        p.terminate()
 
     def Update(self):
         if self.mErrorCount >= 100: return

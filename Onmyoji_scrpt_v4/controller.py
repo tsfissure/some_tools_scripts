@@ -50,10 +50,11 @@ instStopMouseController = StopMouseController()
 
 class MouseController(QThread):
     
-    def __init__(self, hwndList, fightType, layer):
+    def __init__(self, hwndList, fightType, layer, period):
         super(MouseController, self).__init__()
         self.mRunning = False
         self.mGameWindows = []
+        self.mPeriod = period
         hwndList.sort()
         try:
             for i in range(len(hwndList)):
@@ -73,18 +74,28 @@ class MouseController(QThread):
         rdW, rdH = screenWith - 500, screenHeight - 100
 
         self.mRunning = True
+        startTick = int(time.time())
+        RAND_L = 0.3
+        RAND_R = 1.0
         while self.mRunning:
             try:
                 for i in range(len(self.mGameWindows)):
-                    if i > 0: time.sleep(random.uniform(0.4, 0.7))
+                    if i > 0: time.sleep(random.uniform(RAND_L, RAND_R))
                     if not self.mRunning: break
                     self.mGameWindows[i].Update()
-                time.sleep(random.uniform(0.4, 0.7))
+                time.sleep(random.uniform(RAND_L, RAND_R))
                 if not self.mRunning: break
                 self.mMouseCtrl.move(random.randint(100, rdW), random.randint(100, rdH))
-                time.sleep(random.uniform(0.4, 0.7))
+                time.sleep(random.uniform(RAND_L, RAND_R))
+                now = int(time.time())
+                if now - startTick >= self.mPeriod:
+                    for window in self.mGameWindows:
+                        window.KillSelf()
+                    self.mGameWindows = []
+                    break;
             except:
                 WriteErrorLog()
+                self.mGameWindows = []
 
 
 if __name__ == '__main__':
